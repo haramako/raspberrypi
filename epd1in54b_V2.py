@@ -27,16 +27,64 @@
 # THE SOFTWARE.
 #
 
-from epdconfig2 import RaspberryPi
-
-epdconfig = RaspberryPi()
+from machine import Pin, SPI
+import time
 
 # Display resolution
 EPD_WIDTH       = 200
 EPD_HEIGHT      = 200
 
+
+class Config:
+    # Pin definition
+
+    def __init__(self, spi, rst = None, dc = None, cs = None, busy = None):
+        self.spi = spi
+        self.RST_PIN = Pin(22)
+        self.DC_PIN = Pin(21)
+        self.CS_PIN = Pin(20)
+        self.BUSY_PIN = Pin(26)
+
+
+    def digital_write(self, pin, value):
+        pin.value(value)
+
+    def digital_read(self, pin):
+        return pin.value()
+
+    def delay_ms(self, delaytime):
+        time.sleep(delaytime / 1000.0)
+
+    def spi_writebyte(self, data):
+        self.spi.write(bytearray(data))
+
+    def spi_writebyte2(self, data):
+        self.spi.write(bytearray(data))
+
+    def module_init(self):
+        #self.GPIO.setmode(self.GPIO.BCM)
+        #self.GPIO.setwarnings(False)
+        self.RST_PIN.init(self.RST_PIN.OUT)
+        self.DC_PIN.init(self.DC_PIN.OUT)
+        self.CS_PIN.init(self.CS_PIN.OUT)
+        self.BUSY_PIN.init(self.BUSY_PIN.IN)
+
+        return 0
+
+    def module_exit(self):
+        # self.SPI.close()
+
+        self.RST_PIN.value(0)
+        self.DC_PIN.value(0)
+
+        # self.GPIO.cleanup()
+
+epdconfig = None
+
 class EPD:
-    def __init__(self):
+    def __init__(self, spi, rst = None, dc = None, cs = None, busy = None):
+        global epdconfig
+        epdconfig = Config(spi, rst, dc, cs, busy)
         self.reset_pin = epdconfig.RST_PIN
         self.dc_pin = epdconfig.DC_PIN
         self.busy_pin = epdconfig.BUSY_PIN
@@ -137,13 +185,13 @@ class EPD:
         if (blackimage != None):
             self.send_command(0x24) # DATA_START_TRANSMISSION_1
             for i in range(0, int(self.width * self.height / 8)):
-                self.send_data(blackimage[i])
+                self.send_data(~blackimage[i])
                 
         # send red data        
         if (redimage != None):
             self.send_command(0x26) # DATA_START_TRANSMISSION_2
             for i in range(0, int(self.width * self.height / 8)):
-                self.send_data(~redimage[i])  
+                self.send_data(redimage[i])  
 
         self.send_command(0x22) # DISPLAY_REFRESH
         self.send_data(0xF7)
@@ -174,7 +222,8 @@ class EPD:
 
 
 if __name__ == "__main__":
-    epd = EPD()
+    spi = SPI(0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
+    epd = EPD(spi, dc=Pin(21), rst=Pin(22), cs=Pin(20), busy=Pin(26))
     epd.init()
     
 ### END OF FILE ###
