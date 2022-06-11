@@ -1,7 +1,8 @@
 from machine import SPI,Pin,Timer
 from ssd1306 import SSD1306_SPI
-import utime
 
+import math
+import utime
 import time
 import framebuf
 import random
@@ -47,14 +48,11 @@ btn = [
 btn_val = [1 for x in range(4)]
 btn_pushed = [False for x in range(4)]
 
-fb = framebuf.FrameBuffer(bytearray(8), 8,8, framebuf.MONO_VLSB)
-for x in range(8):
-    for y in range(8):
-        fb.pixel(x,y, random.randint(0,1))
+fb = None
 
 class StopWatch:
     def __init__(self):
-        self.edit_sec = 0
+        self.edit_sec = 180
         self.count = 0
         self.changed = True
         self.running = False
@@ -69,6 +67,9 @@ class StopWatch:
             self.changed = True
         if btn_pushed[1]:
             self.edit_sec += 1
+            self.changed = True
+        if btn_pushed[0] and btn_pushed[1]:
+            self.edit_sec = 0
             self.changed = True
         if btn_pushed[2]:
             self.run()
@@ -95,6 +96,10 @@ class StopWatch:
         self.start_at = utime.ticks_ms()
         self.finish_at = self.start_at + self.edit_sec * 1000
         
+    def draw_font(self, oled, x, y, chr):
+        if font[chr]:
+            oled.blit(font[chr], x, y)
+            
     def redraw(self, oled):
         self.count += 1
         oled.fill(0)
@@ -107,9 +112,20 @@ class StopWatch:
         if self.running:
             min = self.rest_sec // 60
             sec = self.rest_sec % 60
+            blink = self.blink
+        else:
+            min = self.edit_sec // 60
+            sec = self.edit_sec % 60
+            blink = True
+            
+        if True:
             separator = ':' if self.blink else ' '
-            oled.text('{:3d}{}{:02d}'.format(min, separator, sec), 0, 32)
-        # oled.blit(fb, 0, 0)
+            self.draw_font(oled, 0, 16, min // 10)
+            self.draw_font(oled, 24, 16, min % 10)
+            if blink:
+                self.draw_font(oled, 48, 16, 10)
+            self.draw_font(oled, 72, 16, sec // 10)
+            self.draw_font(oled, 96, 16, sec % 10)
         oled.show()
         
         
@@ -126,10 +142,22 @@ def on_timer(t):
     stop_watch.update()
 
 
-print("start")
+print("load")
 
+def read_font(path):
+    with open(path, 'rb') as f:
+        bin = f.read()
+        w = bin[0]
+        h = bin[1]
+        return framebuf.FrameBuffer(bytearray(bin[2:]), w, h, framebuf.MONO_VLSB)
+
+font = [read_font('font_{}.bin'.format(n)) for n in range(11)]
+
+print('loaded')
+
+print("start")
 timer = Timer()
-timer.init(period = 100, mode=Timer.PERIODIC, callback = on_timer)
+timer.init(period = 50, mode=Timer.PERIODIC, callback = on_timer)
 
 
 #for b in btn:
